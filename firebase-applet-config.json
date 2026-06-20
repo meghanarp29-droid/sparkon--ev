@@ -1,0 +1,10 @@
+{
+  "projectId": "sparken-ev",
+  "appId": "1:757936966930:web:63e882f54272c3c91a37cb",
+  "apiKey": "AIzaSyCIxZ-B92S-xDw5ujEx1JrObLlrfc9FasM",
+  "authDomain": "sparken-ev.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "sparken-ev.firebasestorage.app",
+  "messagingSenderId": "757936966930",
+  "measurementId": "G-0SNTKVCD8L"
+}

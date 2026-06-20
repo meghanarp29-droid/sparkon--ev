@@ -1,0 +1,84 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile that controls access roles",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Unique user ID matching Auth UID" },
+        "name": { "type": "string", "description": "Display name of the user" },
+        "email": { "type": "string", "description": "User email address" },
+        "role": { "type": "string", "enum": ["user", "admin"], "description": "Assigned platform role" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of profile creation" }
+      },
+      "required": ["uid", "name", "email", "role", "createdAt"]
+    },
+    "Bunk": {
+      "title": "Bunk",
+      "description": "An EV charging station bunk location",
+      "type": "object",
+      "properties": {
+        "bunkId": { "type": "string", "description": "Unique bunk location ID" },
+        "name": { "type": "string", "description": "Name of the EV bunk station" },
+        "address": { "type": "string", "description": "Full street address" },
+        "mobile": { "type": "string", "description": "Contact phone number" },
+        "mapLink": { "type": "string", "description": "Google maps share URL" },
+        "latitude": { "type": "number", "description": "Latitude coordinate for geographic placing" },
+        "longitude": { "type": "number", "description": "Longitude coordinate" },
+        "createdBy": { "type": "string", "description": "Admin user UID who created the bunk" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Created timestamp" }
+      },
+      "required": ["bunkId", "name", "address", "mobile", "createdBy", "createdAt"]
+    },
+    "Slot": {
+      "title": "Slot",
+      "description": "A scheduled charging slot for a bunk",
+      "type": "object",
+      "properties": {
+        "slotId": { "type": "string", "description": "Unique slot ID" },
+        "bunkId": { "type": "string", "description": "Associated bunk ID" },
+        "date": { "type": "string", "description": "Format YYYY-MM-DD" },
+        "time": { "type": "string", "description": "Format HH:MM (24h style)" },
+        "chargerType": { "type": "string", "enum": ["CCS2", "Type 2", "CHAdeMO", "DC Fast"], "description": "Type of electric plug" },
+        "price": { "type": "number", "description": "Price per minute or session" },
+        "status": { "type": "string", "enum": ["available", "booked", "maintenance"], "description": "Slot state" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Created timestamp" }
+      },
+      "required": ["slotId", "bunkId", "date", "time", "chargerType", "price", "status", "createdAt"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "A booked charging slot reservation detail",
+      "type": "object",
+      "properties": {
+        "bookingId": { "type": "string", "description": "Unique booking reservation ID" },
+        "userId": { "type": "string", "description": "Renter UID" },
+        "bunkId": { "type": "string", "description": "Target bunk ID" },
+        "slotId": { "type": "string", "description": "Target slot ID" },
+        "status": { "type": "string", "enum": ["active", "cancelled"], "description": "State of reservation" },
+        "chargingStatus": { "type": "string", "enum": ["Pending", "Charging", "Completed"], "description": "Admin set real-time power phase" },
+        "duration": { "type": "string", "enum": ["30m", "60m", "90m"], "description": "Charging duration selection" },
+        "bookedAt": { "type": "string", "format": "date-time", "description": "Timestamp of purchase" }
+      },
+      "required": ["bookingId", "userId", "bunkId", "slotId", "status", "chargingStatus", "duration", "bookedAt"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "Individual user accounts tracking names and roles"
+    },
+    "bunks/{bunkId}": {
+      "schema": "Bunk",
+      "description": "Bunk charging stations added and managed by admins"
+    },
+    "slots/{slotId}": {
+      "schema": "Slot",
+      "description": "Individual charging slot inventories referenced to stations"
+    },
+    "bookings/{bookingId}": {
+      "schema": "Booking",
+      "description": "Aggregated charging bookings allocated to specific users"
+    }
+  }
+}

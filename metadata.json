@@ -1,0 +1,6 @@
+{
+  "name": "Sparkon EV Charging Slot Booking",
+  "description": "A premium EV charging slot booking system with real-time status updates and administrative control panels.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,150 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Catch-All: Deny everything by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Reuseable global helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isUserVerified() {
+      return isSignedIn() && (request.auth.token.email_verified == true || request.auth.token.firebase.sign_in_provider == 'google.com');
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Check if user role matches admin
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && getUserData().role == 'admin';
+    }
+
+    // 1. Users Collection Rules
+    match /users/{userId} {
+      allow get: if isSignedIn() && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin();
+      
+      allow create: if isSignedIn() 
+                    && isOwner(userId) 
+                    && request.resource.data.keys().hasAll(['uid', 'name', 'email', 'role', 'createdAt'])
+                    && request.resource.data.keys().size() == 5
+                    && request.resource.data.uid == userId
+                    && request.resource.data.email is string
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() <= 100
+                    && request.resource.data.role in ['user', 'admin']
+                    // Forbid users from randomly setting themselves as admin unless they match the bootstrapped email
+                    && (request.resource.data.role == 'user' || request.auth.token.email == 'meghanarp29@gmail.com');
+
+      allow update: if isSignedIn() 
+                    && (isOwner(userId) || isAdmin())
+                    && request.resource.data.uid == resource.data.uid
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    && request.resource.data.email == resource.data.email
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() <= 100
+                    && (request.resource.data.role == resource.data.role || isAdmin());
+    }
+
+    // 2. Bunks Collection Rules
+    match /bunks/{bunkId} {
+      allow get, list: if isSignedIn();
+      allow create: if isAdmin()
+                    && isValidId(bunkId)
+                    && request.resource.data.keys().hasAll(['bunkId', 'name', 'address', 'mobile', 'createdBy', 'createdAt'])
+                    && request.resource.data.bunkId == bunkId
+                    && request.resource.data.name is string && request.resource.data.name.size() <= 150
+                    && request.resource.data.address is string && request.resource.data.address.size() <= 300
+                    && request.resource.data.mobile is string && request.resource.data.mobile.size() <= 30
+                    && request.resource.data.createdBy == request.auth.uid;
+                    
+      allow update: if isAdmin()
+                    && request.resource.data.bunkId == resource.data.bunkId
+                    && request.resource.data.createdBy == resource.data.createdBy
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    && request.resource.data.name is string && request.resource.data.name.size() <= 150
+                    && request.resource.data.address is string && request.resource.data.address.size() <= 300
+                    && request.resource.data.mobile is string && request.resource.data.mobile.size() <= 30;
+
+      allow delete: if isAdmin();
+    }
+
+    // 3. Slots Collection Rules
+    match /slots/{slotId} {
+      allow get, list: if isSignedIn();
+      allow create: if isAdmin()
+                    && isValidId(slotId)
+                    && request.resource.data.keys().hasAll(['slotId', 'bunkId', 'date', 'time', 'chargerType', 'price', 'status', 'createdAt'])
+                    && request.resource.data.slotId == slotId
+                    && request.resource.data.bunkId is string
+                    && request.resource.data.date is string && request.resource.data.date.size() <= 15
+                    && request.resource.data.time is string && request.resource.data.time.size() <= 10
+                    && request.resource.data.chargerType in ['CCS2', 'Type 2', 'CHAdeMO', 'DC Fast']
+                    && request.resource.data.price is number
+                    && request.resource.data.status in ['available', 'booked', 'maintenance'];
+
+      allow update: if isSignedIn()
+                    && request.resource.data.slotId == resource.data.slotId
+                    && request.resource.data.bunkId == resource.data.bunkId
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    // Admin can edit everything, normal users can only toggle status from available to booked
+                    && (
+                      isAdmin() || (
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+                        && request.resource.data.status in ['available', 'booked']
+                      )
+                    );
+
+      allow delete: if isAdmin();
+    }
+
+    // 4. Bookings Collection Rules
+    match /bookings/{bookingId} {
+      allow get, list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      
+      allow create: if isSignedIn()
+                    && isValidId(bookingId)
+                    && request.resource.data.keys().hasAll(['bookingId', 'userId', 'bunkId', 'slotId', 'status', 'chargingStatus', 'duration', 'bookedAt'])
+                    && request.resource.data.keys().size() == 8
+                    && request.resource.data.bookingId == bookingId
+                    && request.resource.data.userId == request.auth.uid
+                    && request.resource.data.bunkId is string
+                    && request.resource.data.slotId is string
+                    && request.resource.data.status == 'active'
+                    && request.resource.data.chargingStatus == 'Pending'
+                    && request.resource.data.duration in ['30m', '60m', '90m'];
+
+      allow update: if isSignedIn()
+                    && (resource.data.userId == request.auth.uid || isAdmin())
+                    && request.resource.data.bookingId == resource.data.bookingId
+                    && request.resource.data.userId == resource.data.userId
+                    && request.resource.data.bunkId == resource.data.bunkId
+                    && request.resource.data.slotId == resource.data.slotId
+                    && request.resource.data.bookedAt == resource.data.bookedAt
+                    // User can only cancel (update status to 'cancelled')
+                    // Admin can update chargingStatus and status
+                    && (
+                      isAdmin() || (
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+                        && request.resource.data.status == 'cancelled'
+                      )
+                    );
+
+      allow delete: if isAdmin();
+    }
+  }
+}
